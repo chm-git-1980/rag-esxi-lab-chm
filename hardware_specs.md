@@ -1,0 +1,1 @@
+4 vCPU / 32GB RAM / 500GB HD setup
