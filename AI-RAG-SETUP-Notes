@@ -1,0 +1,63 @@
+For a small testing lab involving Milvus, HuggingFace, and an orchestrator like LangChain, 100GB is plenty of space to get started. You are in a good position for a "Proof of Concept" (PoC) environment.
+Here is a breakdown of how that storage will likely be consumed so you can manage your VM effectively:
+1. Vector Database: Milvus
+Milvus is typically run via Docker Compose for local labs.
+•	Installation/Images: Docker images for Milvus, Etcd, and MinIO (its dependencies) take up about 2GB–4GB.
+•	Data Storage: This is the variable part. For a "small lab" with 100,000 vectors (1536-dimensions each), you only need about 1GB–2GB of actual disk space for the index and metadata.
+•	MinIO: Milvus uses MinIO for object storage. Even with logs and small collections, it rarely exceeds 5GB in a test setting.
+2. Embedding Models: HuggingFace
+This is where your storage can disappear quickly if you aren't careful.
+•	Library: The transformers and sentence-transformers libraries are negligible (under 1GB).
+•	Model Weights:
+•	Small models (e.g., all-MiniLM-L6-v2) are only ~100MB.
+•	Medium models (e.g., bge-base or e5-large) range from 400MB to 1.5GB.
+•	If you decide to run a local LLM (like Llama 3) via HuggingFace, you'll need 5GB to 15GB per model.
+•	Cache: By default, HuggingFace stores models in ~/.cache/huggingface. If you download five different models to "test them out," you might use 10GB without realizing it.
+3. Orchestrator & Environment
+•	LangChain/LlamaIndex: These are lightweight Python libraries. Even with a full virtual environment (venv) and all dependencies, you are looking at less than 1GB–2GB.
+•	Operating System: A standard Linux install (like Rocky or RHEL) usually takes 5GB–8GB.
+________________________________________
+Estimated Storage Usage (Small Lab)
+Component	Estimated Space
+OS & Basic Tools	10GB
+Milvus (Docker + Data)	10GB
+HF Models (3-4 models)	10GB
+Python Envs & Apps	5GB
+Buffer / Logs / Misc	15GB
+Total Predicted Use	~50GB
+Recommendations for Your 100GB VM
+Since you have 100GB, you have roughly 50GB of "breathing room." Here are a few tips to keep it lean:
+•	Prune Docker: Occasionally run docker system prune to remove old Milvus containers or unused volumes.
+•	Monitor the HF Cache: If you notice your space dropping, check the HuggingFace cache folder. You can set the environment variable HF_HOME to a specific partition if you add more disks later.
+•	Use Virtual Environments: Keep your LangChain/LlamaIndex projects in a venv or conda environment to prevent dependency bloat in the system Python.
+
+
+
+Core Components of a RAG System
+Component	Purpose
+Vector Database	Stores the "memory" of your specific documents (e.g., Pinecone, Milvus, or Weaviate).
+Embedding Model	The "translator" that turns human language into the math (vectors) the database understands.
+Orchestrator	The framework that connects everything together (e.g., LangChain or LlamaIndex).
+
+
+Vector Database Milvus completed 3/18/2026 with some issues, being that the AI SOP contained outdated versions.  There were also required packages which should have been installed, if I had not installed the “minimal” version Rocky Linux.  There were also several of the required packages which were referred, which were out dated and required several repeated attempts to have the packages installed, due to the original package not being available.
+
+
+How they look together
+Component	Where it lives	Example
+Vector DB	Your Rocky Linux Server	Milvus
+Embedding Model	API or Local Python Script	HuggingFace or OpenAI
+Orchestrator	Your Application Code	LangChain or LlamaIndex
+
+
+3/19/2026 – Embedding Model
+
+1. Embeddings: Turning Ideas into Math
+An LLM doesn't "read" words like a human. Instead, it uses an Embedding Model to convert text into a long list of numbers called a Vector.
+•	Semantic Proximity: If you plot these numbers on a map, words with similar meanings end up close together.
+•	Example: In a 2D map, the vector for "Red Hat Linux" would be geographically very close to "CentOS" or "Fedora," but very far away from "Baking Recipes."
+
+Setting up the embedding model, HuggingFace, on RockyLinux was pretty straight forward with no barriers.  There was a warning to update my pip version from the currently installed version 21.3.1 to version 26.0.1.  This upgrade is not required to continue so I will bypass this recommendation for now.  Because you see all those nvidia-... packages in your output, your environment is now equipped with PyTorch, the engine that will run the "math" for your embeddings.
+Without the embedding model, we would not be capable of 
+
+
