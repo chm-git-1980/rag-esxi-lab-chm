@@ -1,0 +1,42 @@
+Standard Operating Procedure: Local Embedding Setup
+1. Environment Preparation
+It is best practice to use a virtual environment to avoid messing with the system Python on Rocky Linux.
+Bash
+# Install python-pip if not already present
+sudo dnf install python3-pip -y
+
+# Create and activate a virtual environment
+python3 -m venv rag-env
+source rag-env/bin/activate
+2. Install the Library
+The sentence-transformers library handles both the logic and the automatic downloading from the HuggingFace Hub.
+Bash
+pip install -U sentence-transformers
+3. Execution & Automatic Download
+When you run the script below for the first time, the library checks your local cache (usually ~/.cache/torch/sentence_transformers/). If the model isn't there, it pulls the weights from HuggingFace.
+Create a file named embed_test.py:
+Python
+from sentence_transformers import SentenceTransformer
+
+# 1. Load the model (This triggers the download on the first run)
+model = SentenceTransformer('all-MiniLM-L6-v2')
+
+# 2. Define your text
+sentences = ["Milvus is a vector database.", "Rocky Linux is a RHEL derivative."]
+
+# 3. Generate the embeddings
+embeddings = model.encode(sentences)
+
+# 4. Inspect the output
+print(f"Model Dimension: {len(embeddings[0])}")
+print(f"Sample Vector (first 5 values): {embeddings[0][:5]}")
+4. Verify the "Math" for Milvus
+When you run python3 embed_test.py, pay attention to the Model Dimension output.
+•	For all-MiniLM-L6-v2, it will be 384.
+•	You must use this number when defining the dim parameter in your Milvus collection schema.
+________________________________________
+Key Technical Notes for Rocky Linux 9
+•	Cache Location: The model weights are stored in your home directory by default. If you are working in a restricted or air-gapped environment later, you can manually move these files to the server.
+•	CPU vs. GPU: By default, this library will look for a GPU. On a standard Rocky Linux server without an NVIDIA card, it will automatically and safely fall back to using your CPU.
+•	Offline Usage: Once the first run is complete and the weights are downloaded, your code no longer requires an internet connection to generate embeddings.
+
