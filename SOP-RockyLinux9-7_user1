@@ -1,0 +1,101 @@
+SOP-Installing a Self-hosted RAG Server on Rocky Linux 9.7 with user
+
+SOP: Installing a Self-Hosted RAG Server on Rocky Linux 9.7 (User: user1)
+Stack: Milvus Vector DB, Hugging Face embeddings, LlamaIndex, and FastAPI.
+Step 1: Update System & Install Dependencies
+Run these with sudo to manage system packages:
+Bash
+sudo dnf update -y
+sudo dnf install -y dnf-plugins-core gcc gcc-c++ make
+Step 2: Install Docker Engine + Docker Compose
+Clean out old versions and install the official Docker engine.
+Bash
+# Remove old versions
+sudo dnf remove -y docker docker-client docker-client-latest docker-common \
+docker-latest docker-latest-logrotate docker-logrotate docker-engine
+
+# Add Docker repo and install
+sudo dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+# Start & enable services
+sudo systemctl enable --now docker
+
+# Add 'user1' to docker group (Crucial: log out and back in after this)
+sudo usermod -aG docker user1
+Step 3: Install & Start Milvus Standalone (v2.6.12)
+As the user user1, create the directory in your home folder.
+Bash
+mkdir -p ~/milvus && cd ~/milvus
+wget https://github.com/milvus-io/milvus/releases/download/v2.6.12/milvus-standalone-docker-compose.yml -O docker-compose.yml
+
+# Start containers (as user1, thanks to the group addition above)
+docker compose up -d
+•	Verify: docker compose ps.
+•	Data Path: /home/user1/milvus/volumes/.
+Step 4: Install Python 3.11
+Bash
+sudo dnf install -y python3.11 python3.11-pip python3.11-devel
+Step 5: Create Project & Virtual Environment
+Set up the environment within user1's home directory.
+Bash
+mkdir -p ~/rag-server/data && cd ~/rag-server
+python3.11 -m venv venv
+source venv/bin/activate
+pip install --upgrade pip setuptools wheel
+Step 6: Install Python Packages
+Install the LlamaIndex and FastAPI stack.
+Bash
+pip install llama-index llama-index-vector-stores-milvus llama-index-embeddings-huggingface llama-index-llms-huggingface fastapi uvicorn pydantic
+# CPU-only Torch
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+Step 7: Create the RAG Index
+Create setup_index.py in ~/rag-server/. Ensure the Milvus URI points to localhost.
+Python
+from llama_index.core import Settings, VectorStoreIndex, StorageContext, SimpleDirectoryReader
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+from llama_index.vector_stores.milvus import MilvusVectorStore
+
+Settings.embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-small-en-v1.5")
+
+vector_store = MilvusVectorStore(
+    uri="http://localhost:19530",
+    dim=384,
+    collection_name="rag_collection",
+    overwrite=True
+)
+storage_context = StorageContext.from_defaults(vector_store=vector_store)
+documents = SimpleDirectoryReader("data").load_data()
+index = VectorStoreIndex.from_documents(documents, storage_context=storage_context)
+print("RAG index created successfully!")
+Run it: python setup_index.py. Place your documents in /home/user1/rag-server/data/.
+Step 8: Build the RAG Server (FastAPI)
+Create app.py in ~/rag-server/. This will serve the API on port 8000.
+Step 9: Run and Test
+Start the server manually to verify it works:
+Bash
+uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+Test using the new hostname:
+Bash
+curl -X POST http://rag-server:8000/query -H "Content-Type: application/json" -d '{"query": "What is the main topic?"}'
+Step 10: Run as System Service (Production)
+Create the service file using sudo. Note the updated paths for 'user1':
+Ini, TOML
+[Unit]
+Description=RAG Server
+After=network.target docker.service
+
+[Service]
+User=user1
+WorkingDirectory=/home/user1/rag-server
+Environment="PATH=/home/user1/rag-server/venv/bin"
+ExecStart=/home/user1/rag-server/venv/bin/uvicorn app:app --host 0.0.0.0 --port 8000
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+Activate:
+Bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now rag-server
+
